@@ -18,6 +18,11 @@
 """
 Random Forest Classifier with Differential Privacy
 """
+
+from sklearn.ensemble import RandomForestRegressor
+from diffprivlib.mechanisms import Laplace
+from diffprivlib.utils import warn_unused_args
+
 from collections import namedtuple
 import warnings
 
@@ -611,6 +616,39 @@ class _FittingTree(DiffprivlibMixin):
             out_ptr[i] = node.node_id
 
         return out
+
+class DifferentiallyPrivateRandomForestRegressor(RandomForestRegressor):
+    def __init__(self, n_estimators=100, epsilon=1.0, bounds=None, random_state=None, **kwargs):
+        super().__init__(n_estimators=n_estimators, **kwargs)
+        self.epsilon = epsilon
+        self.bounds = bounds
+        self.random_state = random_state
+
+    def _dp_mean(self, array):
+        epsilon = self.epsilon  # Privacy parameter
+        bounds = self.bounds if self.bounds else (np.min(array), np.max(array))  # Bounds of the array
+        
+        # Compute sensitivity (max possible change in output when a single record is added or removed)
+        sensitivity = np.abs(bounds[1] - bounds[0]) / len(array)
+
+        # Create Laplace noise mechanism
+        laplace_mechanism = Laplace(epsilon=epsilon, sensitivity=sensitivity, random_state=self.random_state)
+
+        # Compute differentially private mean
+        private_mean = np.mean(array) + laplace_mechanism.sample()
+        return private_mean
+
+    def fit(self, X, y):
+        super().fit(X, y)  # Fit the RandomForestRegressor
+
+    def predict(self, X):
+        predictions = super().predict(X)
+        return predictions
+
+# Example usage:
+# dp_rf_regressor = DifferentiallyPrivateRandomForestRegressor(n_estimators=100, epsilon=1.0)
+# dp_rf_regressor.fit(X_train, y_train)
+# predictions = dp_rf_regressor.predict(X_test)
 
 
 class _Node:
