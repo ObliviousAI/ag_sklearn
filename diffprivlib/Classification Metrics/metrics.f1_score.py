@@ -2,7 +2,7 @@ from sklearn import metrics
 import numpy as np
 from diffprivlib.tools.utils import mean
 
-def dp_f1_score(y_true, y_pred, epsilon=1.0):
+def f1_score(y_true, y_pred, epsilon=1.0):
     # Convert labels to numpy arrays if they're not already
     y_true = np.asarray(y_true)
     y_pred = np.asarray(y_pred)
@@ -14,4 +14,4 @@ def dp_f1_score(y_true, y_pred, epsilon=1.0):
     dp_mean = mean(y_pred, epsilon=epsilon)
     dp_f1 = f1  # You may adjust this according to your DP calculation
 
-    return f1, dp_f1
+    return dp_f1
