@@ -53,7 +53,9 @@ from diffprivlib.mechanisms import LaplaceBoundedDomain, GeometricTruncated, Lap
 from diffprivlib.utils import PrivacyLeakWarning, warn_unused_args, check_random_state
 from diffprivlib.validation import check_bounds, clip_to_bounds
 
-_sum_ = sum
+from opendp.mod import enable_features
+from opendp.measurements import  make_base_laplace
+
 
 
 def _wrap_axis(func, array, *, axis, keepdims, epsilon, bounds, **kwargs):
@@ -423,7 +425,6 @@ def nanvar(array, epsilon=1.0, bounds=None, axis=None, dtype=None, keepdims=Fals
     return _var(array, epsilon=epsilon, bounds=bounds, axis=axis, dtype=dtype, keepdims=keepdims,
                 random_state=random_state, accountant=accountant, nan=True)
 
-
 def _var(array, epsilon=1.0, bounds=None, axis=None, dtype=None, keepdims=False, random_state=None, accountant=None,
          nan=False):
     random_state = check_random_state(random_state)
@@ -446,18 +447,24 @@ def _var(array, epsilon=1.0, bounds=None, axis=None, dtype=None, keepdims=False,
     # Let's ravel array to be single-dimensional
     array = clip_to_bounds(np.ravel(array), bounds)
 
-    _func = np.nanvar if nan else np.var
-    actual_var = _func(array, axis=axis, dtype=dtype, keepdims=keepdims)
+    # Calculate sensitivity for variance
+    sensitivity = ((upper - lower) / array.size) ** 2 * (array.size - 1)
 
-    dp_mech = LaplaceBoundedDomain(epsilon=epsilon, delta=0,
-                                   sensitivity=((upper - lower) / array.size) ** 2 * (array.size - 1), lower=0,
-                                   upper=((upper - lower) ** 2) / 4, random_state=random_state)
-    output = dp_mech.randomise(actual_var)
+    # Enable advanced features for OpenDP
+    enable_features("contrib")
+
+    # Create Laplace mechanism for noise addition
+    laplace_mechanism = make_base_laplace(scale=sensitivity / epsilon)
+
+    # Compute actual variance
+    actual_var = np.var(array, axis=axis, dtype=dtype, keepdims=keepdims)
+
+    # Add Laplace noise to achieve differential privacy
+    output = laplace_mechanism(actual_var)
 
     accountant.spend(epsilon, 0)
 
     return output
-
 
 def std(array, epsilon=1.0, bounds=None, axis=None, dtype=None, keepdims=False, random_state=None, accountant=None,
         **unused_args):
@@ -586,14 +593,32 @@ def _std(array, epsilon=1.0, bounds=None, axis=None, dtype=None, keepdims=False,
     ret = _var(array, epsilon=epsilon, bounds=bounds, axis=axis, dtype=dtype, keepdims=keepdims,
                random_state=random_state, accountant=accountant, nan=nan)
 
-    if isinstance(ret, mu.ndarray):
-        ret = um.sqrt(ret)
-    elif hasattr(ret, 'dtype'):
-        ret = ret.dtype.type(um.sqrt(ret))
-    else:
-        ret = um.sqrt(ret)
+    accountant = BudgetAccountant.load_default(accountant)
+    accountant.check(epsilon, 0)
 
-    return ret
+    # Calculate sensitivity for standard deviation
+    sensitivity = 0.5  # Sensitivity of square root operation
+
+    # Enable advanced features for OpenDP
+    enable_features("contrib")
+
+    # Create Laplace mechanism for noise addition
+    laplace_mechanism = make_base_laplace(scale=sensitivity / epsilon)
+
+    # Apply square root to the result of variance calculation (ret)
+    if isinstance(ret, np.ndarray):
+        ret = np.sqrt(ret)
+    elif hasattr(ret, 'dtype'):
+        ret = ret.dtype.type(np.sqrt(ret))
+    else:
+        ret = np.sqrt(ret)
+
+    # Add Laplace noise to achieve differential privacy for standard deviation
+    output = laplace_mechanism(ret)
+
+    accountant.spend(epsilon, 0)
+
+    return output
 
 
 def sum(array, epsilon=1.0, bounds=None, axis=None, dtype=None, keepdims=False, random_state=None, accountant=None,
