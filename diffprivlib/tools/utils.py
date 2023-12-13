@@ -56,6 +56,8 @@ from diffprivlib.validation import check_bounds, clip_to_bounds
 from opendp.mod import enable_features
 from opendp.measurements import  make_base_laplace
 
+_sum_ = sum
+
 
 
 def _wrap_axis(func, array, *, axis, keepdims, epsilon, bounds, **kwargs):
