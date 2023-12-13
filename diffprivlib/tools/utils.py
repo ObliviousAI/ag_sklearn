@@ -53,6 +53,9 @@ from diffprivlib.mechanisms import LaplaceBoundedDomain, GeometricTruncated, Lap
 from diffprivlib.utils import PrivacyLeakWarning, warn_unused_args, check_random_state
 from diffprivlib.validation import check_bounds, clip_to_bounds
 
+from opendp.mod import enable_features
+from opendp.measurements import  make_base_laplace
+
 _sum_ = sum
 
 
@@ -292,13 +295,22 @@ def _mean(array, epsilon=1.0, bounds=None, axis=None, dtype=None, keepdims=False
     _func = np.nanmean if nan else np.mean
     actual_mean = _func(array, axis=axis, dtype=dtype, keepdims=keepdims)
 
-    mech = LaplaceTruncated(epsilon=epsilon, delta=0, sensitivity=(upper - lower) / array.size, lower=lower,
-                            upper=upper, random_state=random_state)
-    output = mech.randomise(actual_mean)
+    # Calculate sensitivity for mean calculation
+    sensitivity = (upper - lower) / array.size
+
+    # Enable advanced features for OpenDP
+    enable_features("contrib")
+
+    # Create Laplace mechanism for noise addition
+    laplace_mechanism = make_base_laplace(scale=sensitivity / epsilon)
+
+    # Add Laplace noise to achieve differential privacy for mean
+    output = laplace_mechanism(actual_mean)
 
     accountant.spend(epsilon, 0)
 
     return output
+
 
 
 def var(array, epsilon=1.0, bounds=None, axis=None, dtype=None, keepdims=False, random_state=None, accountant=None,
@@ -731,16 +743,22 @@ def _sum(array, epsilon=1.0, bounds=None, axis=None, dtype=None, keepdims=False,
     accountant = BudgetAccountant.load_default(accountant)
     accountant.check(epsilon, 0)
 
-    # Let's ravel array to be single-dimensional
     array = clip_to_bounds(np.ravel(array), bounds)
 
     _func = np.nansum if nan else np.sum
     actual_sum = _func(array, axis=axis, dtype=dtype, keepdims=keepdims)
 
-    mech = GeometricTruncated if dtype is not None and issubclass(dtype, Integral) else LaplaceTruncated
-    mech = mech(epsilon=epsilon, sensitivity=upper - lower, lower=lower * array.size, upper=upper * array.size,
-                random_state=random_state)
-    output = mech.randomise(actual_sum)
+    # Calculate sensitivity for sum calculation
+    sensitivity = upper - lower
+
+    # Enable advanced features for OpenDP
+    enable_features("contrib")
+
+    # Create Laplace mechanism for noise addition
+    laplace_mechanism = make_base_laplace(scale=sensitivity / epsilon)
+
+    # Add Laplace noise to achieve differential privacy for sum
+    output = laplace_mechanism(actual_sum)
 
     accountant.spend(epsilon, 0)
 
