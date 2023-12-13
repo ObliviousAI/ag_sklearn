@@ -29,6 +29,20 @@ from diffprivlib.validation import clip_to_bounds, check_bounds
 from diffprivlib.tools.utils import _wrap_axis
 
 
+from opendp.mod import enable_features
+from opendp.measurements import  make_base_laplace
+
+def calculate_sensitivity_for_median(array):
+    # Sort the array
+    sorted_array = np.sort(array)
+
+    # Calculate sensitivity for median (50th percentile)
+    n = len(sorted_array)
+    max_sensitivity = max(abs(sorted_array[n // 2] - sorted_array[n // 2 - 1]),
+                         abs(sorted_array[n // 2] - sorted_array[n // 2 + 1]))
+    return max_sensitivity
+
+
 def quantile(array, quant, epsilon=1.0, bounds=None, axis=None, keepdims=False, random_state=None, accountant=None,
              **unused_args):
     r"""
@@ -139,6 +153,17 @@ def quantile(array, quant, epsilon=1.0, bounds=None, axis=None, keepdims=False, 
                        measure=list(interval_sizes), random_state=random_state)
     idx = mech.randomise()
     output = random_state.random() * (array[idx+1] - array[idx]) + array[idx]
+
+    # Enable advanced features for OpenDP
+    enable_features("contrib")
+
+    # Calculate sensitivity for quantile calculation (assuming quantile is for the median)
+    sensitivity = calculate_sensitivity_for_median(array)
+
+    # Create Laplace mechanism for noise addition
+    laplace_mechanism = make_base_laplace(scale=sensitivity / epsilon)
+
+    output = laplace_mechanism(output)
 
     accountant.spend(epsilon, 0)
 
