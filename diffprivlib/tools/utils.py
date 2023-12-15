@@ -53,6 +53,11 @@ from diffprivlib.mechanisms import LaplaceBoundedDomain, GeometricTruncated, Lap
 from diffprivlib.utils import PrivacyLeakWarning, warn_unused_args, check_random_state
 from diffprivlib.validation import check_bounds, clip_to_bounds
 
+from opendp.mod import enable_features
+from opendp.measurements import  make_base_laplace,make_base_discrete_laplace
+from opendp.domains import atom_domain
+from opendp.metrics import absolute_distance
+
 _sum_ = sum
 
 
