@@ -457,20 +457,23 @@ def _var(array, epsilon=1.0, bounds=None, axis=None, dtype=None, keepdims=False,
     # # Enable advanced features for OpenDP
     enable_features("contrib")
 
-
-    # # Calculate sensitivity for variance
+    if np.isnan(output):
+        return output
+   
     sensitivity=((upper - lower) / array.size) ** 2 * (array.size - 1)
     laplace_scale = sensitivity / epsilon
 
-    laplace_noise = np.random.laplace(scale=laplace_scale)
-    output = output + laplace_noise
+    input_space = atom_domain(T=float), absolute_distance(T=float)
+    base_lap = make_base_laplace(*input_space, scale=laplace_scale)    
+
+    output = base_lap(output)
 
     accountant.spend(epsilon, 0)
 
-    output=np.clip(output,0,1)
+    output=np.clip(output,0,((upper - lower) ** 2) / 4)
 
     return output
-
+             
 def std(array, epsilon=1.0, bounds=None, axis=None, dtype=None, keepdims=False, random_state=None, accountant=None,
         **unused_args):
     r"""
