@@ -431,6 +431,9 @@ def _var(array, epsilon=1.0, bounds=None, axis=None, dtype=None, keepdims=False,
          nan=False):
     random_state = check_random_state(random_state)
 
+    if array.ndim == 1:
+        array = array.reshape(-1, 1)
+
     if bounds is None:
         warnings.warn("Bounds have not been specified and will be calculated on the data provided. This will "
                       "result in additional privacy leakage. To ensure differential privacy and no additional "
