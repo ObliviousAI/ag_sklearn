@@ -49,7 +49,6 @@ from numpy.core import multiarray as mu
 from numpy.core import umath as um
 
 from diffprivlib.accountant import BudgetAccountant
-from diffprivlib.mechanisms import LaplaceBoundedDomain, GeometricTruncated, LaplaceTruncated
 from diffprivlib.utils import PrivacyLeakWarning, warn_unused_args, check_random_state
 from diffprivlib.validation import check_bounds, clip_to_bounds
 
@@ -295,16 +294,30 @@ def _mean(array, epsilon=1.0, bounds=None, axis=None, dtype=None, keepdims=False
     array = clip_to_bounds(np.ravel(array), bounds)
 
     _func = np.nanmean if nan else np.mean
+    
     actual_mean = _func(array, axis=axis, dtype=dtype, keepdims=keepdims)
 
-    mech = LaplaceTruncated(epsilon=epsilon, delta=0, sensitivity=(upper - lower) / array.size, lower=lower,
-                            upper=upper, random_state=random_state)
-    output = mech.randomise(actual_mean)
+    if np.isnan(actual_mean):
+        return actual_mean
+
+    # Calculate sensitivity for mean calculation
+    sensitivity = (upper - lower) / array.size
+
+    # Enable advanced features for OpenDP
+    enable_features("contrib")
+
+    laplace_scale = sensitivity / epsilon
+
+    input_space = atom_domain(T=float), absolute_distance(T=float)
+    base_lap = make_base_laplace(*input_space, scale=laplace_scale)    
+
+    output = base_lap(actual_mean)
 
     accountant.spend(epsilon, 0)
 
-    return output
+    output=np.clip(output,lower,upper)
 
+    return output
 
 def var(array, epsilon=1.0, bounds=None, axis=None, dtype=None, keepdims=False, random_state=None, accountant=None,
         **unused_args):
@@ -454,16 +467,11 @@ def _var(array, epsilon=1.0, bounds=None, axis=None, dtype=None, keepdims=False,
     _func = np.nanvar if nan else np.var
     actual_var = _func(array, axis=axis, dtype=dtype, keepdims=keepdims)
 
-    dp_mech = LaplaceBoundedDomain(epsilon=epsilon, delta=0,
-                                   sensitivity=((upper - lower) / array.size) ** 2 * (array.size - 1), lower=0,
-                                   upper=((upper - lower) ** 2) / 4, random_state=random_state)
-    output = dp_mech.randomise(actual_var)
+    if np.isnan(actual_var):
+        return actual_var
 
-    # # Enable advanced features for OpenDP
+     # # Enable advanced features for OpenDP
     enable_features("contrib")
-
-    if np.isnan(output):
-        return output
    
     sensitivity=((upper - lower) / array.size) ** 2 * (array.size - 1)
     laplace_scale = sensitivity / epsilon
@@ -471,14 +479,15 @@ def _var(array, epsilon=1.0, bounds=None, axis=None, dtype=None, keepdims=False,
     input_space = atom_domain(T=float), absolute_distance(T=float)
     base_lap = make_base_laplace(*input_space, scale=laplace_scale)    
 
-    output = base_lap(output)
+    output = base_lap(actual_var)
 
     accountant.spend(epsilon, 0)
 
     output=np.clip(output,0,((upper - lower) ** 2) / 4)
 
     return output
-             
+
+
 def std(array, epsilon=1.0, bounds=None, axis=None, dtype=None, keepdims=False, random_state=None, accountant=None,
         **unused_args):
     r"""
@@ -734,6 +743,7 @@ def nansum(array, epsilon=1.0, bounds=None, axis=None, dtype=None, keepdims=Fals
 
 def _sum(array, epsilon=1.0, bounds=None, axis=None, dtype=None, keepdims=False, random_state=None, accountant=None,
          nan=False):
+    
     random_state = check_random_state(random_state)
 
     if bounds is None:
@@ -757,11 +767,33 @@ def _sum(array, epsilon=1.0, bounds=None, axis=None, dtype=None, keepdims=False,
     _func = np.nansum if nan else np.sum
     actual_sum = _func(array, axis=axis, dtype=dtype, keepdims=keepdims)
 
-    mech = GeometricTruncated if dtype is not None and issubclass(dtype, Integral) else LaplaceTruncated
-    mech = mech(epsilon=epsilon, sensitivity=upper - lower, lower=lower * array.size, upper=upper * array.size,
-                random_state=random_state)
-    output = mech.randomise(actual_sum)
+    if np.isnan(actual_sum):
+        return actual_sum
+
+    # Enable advanced features for OpenDP
+    enable_features("contrib")
+
+    # # Calculate sensitivity for sum calculation
+    sensitivity = upper - lower
+    laplace_scale = sensitivity / epsilon
+
+    if dtype == int:
+        input_space = atom_domain(T=int), absolute_distance(T=int)
+        base_lap = make_base_discrete_laplace(*input_space, scale=laplace_scale)
+    else :
+        input_space = atom_domain(T=float), absolute_distance(T=float)
+        base_lap = make_base_laplace(*input_space, scale=laplace_scale)
+
 
     accountant.spend(epsilon, 0)
+    output=base_lap(actual_sum)
+    
+    lower_bound = lower * array.size
+    upper_bound = upper * array.size
 
+    output=np.clip(output,lower_bound,upper_bound)
+
+    if(dtype==int):
+      output=int(output)
+    
     return output
