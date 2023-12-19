@@ -150,7 +150,7 @@ def count_nonzero(array, epsilon=1.0, axis=None, keepdims=False, random_state=No
     else:
         array_bool = array.astype(np.bool_, copy=False)
 
-    return sum(array_bool, axis=axis, dtype=np.intp, bounds=(0, 1), epsilon=epsilon, keepdims=keepdims,
+    return sum(array_bool, axis=axis, dtype=int, bounds=(0, 1), epsilon=epsilon, keepdims=keepdims,
                random_state=random_state, accountant=accountant)
 
 
