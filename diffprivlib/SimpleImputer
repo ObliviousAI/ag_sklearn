@@ -1,5 +1,6 @@
 import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
+from diffprivlib.tools.utils import nanmean
 
 class DifferentiallyPrivateImputer(BaseEstimator, TransformerMixin):
     def __init__(self, missing_values=np.nan, strategy='mean', fill_value=None, epsilon=1.0):
@@ -14,12 +15,12 @@ class DifferentiallyPrivateImputer(BaseEstimator, TransformerMixin):
         elif self.strategy == 'constant':
             self.statistics_ = [self.fill_value] * X.shape[1]
         else:
-            self.statistics_ = [np.nanmean(col) if np.issubdtype(col.dtype, np.number) else np.nan for col in X.T]
+            self.statistics_ = [nanmean(col) if np.issubdtype(col.dtype, np.number) else np.nan for col in X.T]
         return self
     
     def _impute_mean(self, col, missing_col):
         non_missing_values = col[~missing_col]
-        col_mean = np.nanmean(non_missing_values)
+        col_mean = nanmean(non_missing_values)
         sensitivity = np.nanmax(np.abs(non_missing_values - col_mean))
         return col_mean, sensitivity
     
