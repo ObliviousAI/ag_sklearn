@@ -269,7 +269,7 @@ def histogramdd(sample, epsilon=1.0, bins=10, range=None, weights=None, density=
     sensitivity=1
     laplace_scale = sensitivity / epsilon
 
-    if (isinstance(sample, list) and isinstance(sample, list)) or (isinstance(sample, np.ndarray) and np.issubdtype(sample.dtype, np.integer)) :
+    if (isinstance(sample, list) and (isinstance(elem, int) for elem in sample)) or (isinstance(sample, np.ndarray) and np.issubdtype(sample.dtype, np.integer)) :
         input_space = atom_domain(T=int), absolute_distance(T=int)
         base_lap = make_base_discrete_laplace(*input_space, scale=laplace_scale)
     else :
