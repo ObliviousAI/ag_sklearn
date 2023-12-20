@@ -142,6 +142,7 @@ class BudgetAccountant:
         self.__delta = delta
         self.__spent_budget = []
         self.slack = slack
+        self.dataset_budgets = {}
 
         if spent_budget is not None:
             if not isinstance(spent_budget, list):
@@ -467,3 +468,24 @@ class BudgetAccountant:
         default = BudgetAccountant._default
         BudgetAccountant._default = None
         return default
+    
+    def add_to_budget(self, dataset_id, epsilon, delta):
+        if dataset_id not in self.dataset_budgets:
+            self.dataset_budgets[dataset_id] = BudgetAccountant()
+
+        self.dataset_budgets[dataset_id].spend(epsilon, delta)
+    
+    def total_for_dataset(self, dataset_id):
+        if dataset_id in self.dataset_budgets:
+            return self.dataset_budgets[dataset_id].total()
+        else:
+            return Budget(0, 0) 
+
+    def total_related_datasets(self, related_dataset_ids):
+        total_epsilon, total_delta = 0, 0
+        for dataset_id in related_dataset_ids:
+            epsilon, delta = self.total_for_dataset(dataset_id)
+            total_epsilon += epsilon
+            total_delta += delta
+
+        return Budget(total_epsilon, total_delta)
