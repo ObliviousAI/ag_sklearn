@@ -49,8 +49,12 @@ from sys import maxsize
 import numpy as np
 
 from diffprivlib.accountant import BudgetAccountant
-from diffprivlib.mechanisms import GeometricTruncated
 from diffprivlib.utils import PrivacyLeakWarning, warn_unused_args, check_random_state
+
+from opendp.mod import enable_features
+from opendp.measurements import  make_base_laplace,make_base_discrete_laplace
+from opendp.domains import atom_domain
+from opendp.metrics import absolute_distance
 
 
 # noinspection PyShadowingBuiltins
@@ -140,12 +144,23 @@ def histogram(sample, epsilon=1.0, bins=10, range=None, weights=None, density=No
 
     hist, bin_edges = np.histogram(sample, bins=bins, range=range, weights=weights, density=None)
 
-    dp_mech = GeometricTruncated(epsilon=epsilon, sensitivity=1, lower=0, upper=maxsize, random_state=random_state)
+    enable_features("contrib")
+
+    sensitivity=1
+    laplace_scale = sensitivity / epsilon
+
+    if sample.dtype == int:
+        input_space = atom_domain(T=int), absolute_distance(T=int)
+        base_lap = make_base_discrete_laplace(*input_space, scale=laplace_scale)
+    else :
+        input_space = atom_domain(T=float), absolute_distance(T=float)
+        base_lap = make_base_laplace(*input_space, scale=laplace_scale)
 
     dp_hist = np.zeros_like(hist)
 
     for i in np.arange(dp_hist.shape[0]):
-        dp_hist[i] = dp_mech.randomise(int(hist[i]))
+        dp_hist[i] = base_lap(int(hist[i]))
+        dp_hist[i]=np.clip(dp_hist[i],0,maxsize)
 
     # dp_hist = dp_hist.astype(float, casting='safe')
 
@@ -155,7 +170,10 @@ def histogram(sample, epsilon=1.0, bins=10, range=None, weights=None, density=No
         bin_sizes = np.array(np.diff(bin_edges), float)
         return dp_hist / bin_sizes / (dp_hist.sum() if dp_hist.sum() else 1), bin_edges
 
+    
     return dp_hist, bin_edges
+
+    
 
 
 # noinspection PyShadowingBuiltins
@@ -246,13 +264,23 @@ def histogramdd(sample, epsilon=1.0, bins=10, range=None, weights=None, density=
 
     hist, bin_edges = np.histogramdd(sample, bins=bins, range=range, weights=weights, density=None)
 
-    dp_mech = GeometricTruncated(epsilon=epsilon, sensitivity=1, lower=0, upper=maxsize, random_state=random_state)
+    enable_features("contrib")
+
+    sensitivity=1
+    laplace_scale = sensitivity / epsilon
+
+    if (isinstance(sample, list) and isinstance(sample, list)) or (isinstance(sample, np.ndarray) and np.issubdtype(sample.dtype, np.integer)) :
+        input_space = atom_domain(T=int), absolute_distance(T=int)
+        base_lap = make_base_discrete_laplace(*input_space, scale=laplace_scale)
+    else :
+        input_space = atom_domain(T=float), absolute_distance(T=float)
+        base_lap = make_base_laplace(*input_space, scale=laplace_scale)
 
     dp_hist = np.zeros_like(hist)
     iterator = np.nditer(hist, flags=['multi_index'])
 
     while not iterator.finished:
-        dp_hist[iterator.multi_index] = dp_mech.randomise(int(iterator[0]))
+        dp_hist[iterator.multi_index] = base_lap(int(iterator[0]))
         iterator.iternext()
 
     dp_hist = dp_hist.astype(float, casting='safe')
