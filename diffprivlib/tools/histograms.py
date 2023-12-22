@@ -52,7 +52,7 @@ from diffprivlib.accountant import BudgetAccountant
 from diffprivlib.utils import PrivacyLeakWarning, warn_unused_args, check_random_state
 
 from opendp.mod import enable_features
-from opendp.measurements import  make_base_laplace,make_base_discrete_laplace
+from opendp.measurements import make_base_discrete_laplace
 from opendp.domains import atom_domain
 from opendp.metrics import absolute_distance
 
@@ -154,7 +154,7 @@ def histogram(sample, epsilon=1.0, bins=10, range=None, weights=None, density=No
         base_lap = make_base_discrete_laplace(*input_space, scale=laplace_scale)
     else :
         input_space = atom_domain(T=float), absolute_distance(T=float)
-        base_lap = make_base_laplace(*input_space, scale=laplace_scale)
+        base_lap = make_base_discrete_laplace(*input_space, scale=laplace_scale)
 
     dp_hist = np.zeros_like(hist)
 
@@ -274,13 +274,14 @@ def histogramdd(sample, epsilon=1.0, bins=10, range=None, weights=None, density=
         base_lap = make_base_discrete_laplace(*input_space, scale=laplace_scale)
     else :
         input_space = atom_domain(T=float), absolute_distance(T=float)
-        base_lap = make_base_laplace(*input_space, scale=laplace_scale)
+        base_lap = make_base_discrete_laplace(*input_space, scale=laplace_scale)
 
     dp_hist = np.zeros_like(hist)
     iterator = np.nditer(hist, flags=['multi_index'])
 
     while not iterator.finished:
         dp_hist[iterator.multi_index] = base_lap(int(iterator[0]))
+
         iterator.iternext()
 
     dp_hist = dp_hist.astype(float, casting='safe')
