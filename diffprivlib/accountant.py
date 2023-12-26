@@ -475,13 +475,27 @@ class BudgetAccountant:
 
         self.dataset_budgets[dataset_id].spend(epsilon, delta)
     
-    def add_to_budget(self,dataset_id,open_dp_mechnasim,sensitivity=1):
+    def add_to_budget_laplace(self,dataset_id,open_dp_mechnasim,sensitivity=1):
         if dataset_id not in self.dataset_budgets:
             self.dataset_budgets[dataset_id] = BudgetAccountant()
 
         epsilon=open_dp_mechnasim.map(d_in=sensitivity)
-        #considering 0 delta spent in the mechnasim
+
         self.dataset_budgets[dataset_id].spend(epsilon,0)
+    
+    def add_to_budget_guassian(self,dataset_id,open_dp_mechnasim,sensitivity=1):
+        if dataset_id not in self.dataset_budgets:
+            self.dataset_budgets[dataset_id] = BudgetAccountant()
+
+        rho = open_dp_mechnasim.map(d_in=sensitivity)
+
+        scale = np.sqrt((sensitivity**2) / (2 * rho))
+
+        epsilon = sensitivity/scale
+
+        delta=1.25 * np.exp(-epsilon * rho * sensitivity / 2)
+        
+        self.dataset_budgets[dataset_id].spend(epsilon,delta)
     
     def total_for_dataset(self, dataset_id):
         if dataset_id in self.dataset_budgets:
