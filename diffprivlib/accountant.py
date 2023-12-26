@@ -475,17 +475,36 @@ class BudgetAccountant:
 
         self.dataset_budgets[dataset_id].spend(epsilon, delta)
     
+    def add_to_budget(self,dataset_id,open_dp_mechnasim,sensitivity=1):
+        if dataset_id not in self.dataset_budgets:
+            self.dataset_budgets[dataset_id] = BudgetAccountant()
+
+        epsilon=open_dp_mechnasim.map(d_in=sensitivity)
+        #considering 0 delta spent in the mechnasim
+        self.dataset_budgets[dataset_id].spend(epsilon,0)
+    
     def total_for_dataset(self, dataset_id):
         if dataset_id in self.dataset_budgets:
             return self.dataset_budgets[dataset_id].total()
         else:
             return Budget(0, 0) 
 
-    def total_related_datasets(self, related_dataset_ids):
-        total_epsilon, total_delta = 0, 0
-        for dataset_id in related_dataset_ids:
-            epsilon, delta = self.total_for_dataset(dataset_id)
-            total_epsilon += epsilon
-            total_delta += delta
+    def total_related_datasets(self, dataset_id):
+        visited = set()  # Track visited nodes to avoid cycles
+        return Budget(self._calculate_budget(dataset_id, visited))
+    
+    def _calculate_budget(self, dataset_id, visited):
+        if dataset_id in visited:
+            return 0, 0  # Avoid cycles in the graph
 
-        return Budget(total_epsilon, total_delta)
+        visited.add(dataset_id)
+        total_epsilon, total_delta = self.total_for_dataset(dataset_id)
+
+        if dataset_id in self.graph:
+            related_datasets = self.graph[dataset_id]
+            for related_dataset_id in related_datasets:
+                epsilon, delta = self._calculate_budget(related_dataset_id, visited)
+                total_epsilon += epsilon
+                total_delta += delta
+
+        return total_epsilon, total_delta
