@@ -503,21 +503,21 @@ class BudgetAccountant:
         else:
             return Budget(0, 0) 
 
-    def total_related_datasets(self, dataset_id):
+    def total_related_datasets(self, dataset_id, graph):
         visited = set()  # Track visited nodes to avoid cycles
-        return Budget(self._calculate_budget(dataset_id, visited))
-    
-    def _calculate_budget(self, dataset_id, visited):
+        return Budget(*self._calculate_budget(dataset_id, visited, graph))
+
+    def _calculate_budget(self, dataset_id, visited, graph):
         if dataset_id in visited:
             return 0, 0  # Avoid cycles in the graph
 
         visited.add(dataset_id)
         total_epsilon, total_delta = self.total_for_dataset(dataset_id)
 
-        if dataset_id in self.graph:
-            related_datasets = self.graph[dataset_id]
+        if dataset_id in graph:
+            related_datasets = graph[dataset_id]
             for related_dataset_id in related_datasets:
-                epsilon, delta = self._calculate_budget(related_dataset_id, visited)
+                epsilon, delta = self._calculate_budget(related_dataset_id, visited, graph)
                 total_epsilon += epsilon
                 total_delta += delta
 
