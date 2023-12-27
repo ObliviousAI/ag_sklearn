@@ -437,3 +437,64 @@ class TestBudgetAccountant(TestCase):
         self.assertNotIn("5", repr(acc))
         self.assertNotIn("5", acc.__repr__(10))
         self.assertIn("5", acc.__repr__(11))
+    
+    def test_add_to_budget(self):
+        # Test adding budgets to specific datasets
+        dataset_id = 'dataset1'
+        acc = BudgetAccountant()
+        acc.add_to_budget(dataset_id, 0.5, 0.1)
+        epsilon, delta = acc.total_for_dataset(dataset_id)
+        self.assertEqual(epsilon, 0.5)
+        self.assertEqual(delta, 0.1)
+    
+    def test_add_to_budget(self):
+        dataset_id = "xyz456"  # Mock dataset ID
+        
+        acc = BudgetAccountant()
+
+        acc.add_to_budget(dataset_id, 2, 0)
+
+        new_epsilon, new_delta = acc.total_for_dataset(dataset_id)
+        self.assertEqual(new_epsilon, 2)
+        self.assertEqual(new_delta, 0) # Epsilon should not be zero for Laplace mechanism
+
+    def test_total_related_datasets(self):
+        # Scenario 1: Empty graph
+        acc = BudgetAccountant()
+        acc.add_to_budget("abc123", 1, 0)
+        acc.add_to_budget("xyz456", 1.5, 0)
+        acc.add_to_budget("def789", 2, 0)
+        acc.add_to_budget("ghi012", 2.5, 0)
+
+        graph = {}
+        dataset_id = "abc123"
+        epsilon, delta = acc.total_related_datasets(dataset_id, graph)
+        self.assertEqual(epsilon, 1)
+        self.assertEqual(delta, 0)
+
+        # Scenario 2: Linear dependency graph
+        graph = {
+            "abc123": ["xyz456"],
+            "xyz456": ["def789"],
+            "def789": []
+        }
+        dataset_id = "abc123"
+        epsilon, delta = acc.total_related_datasets(dataset_id, graph)
+       
+        self.assertEqual(epsilon, 4.5)
+        self.assertEqual(delta, 0)
+
+        # Scenario 3: Complex dependency graph
+        graph = {
+            "abc123": ["xyz456", "def789"],
+            "xyz456": ["ghi012"],
+            "def789": []
+            # Add more nodes as needed for a more complex graph
+        }
+        dataset_id = "abc123"
+        epsilon, delta = acc.total_related_datasets(dataset_id, graph)
+    
+        self.assertEqual(epsilon,7)
+        self.assertEqual(delta, 0)
+
+        # Add more scenarios with different graphs and datasets to cover various cases
