@@ -38,7 +38,6 @@ def find_quantile(array, quant,epsilon,bounds,random_state):
     r+=scale
 
     for _ in range(32):
-        epsilon=epsilon
         mid=(l+r)/2
         val=mean((array<=mid).astype(int),epsilon,bounds=bounds,random_state=random_state)
         if(val>=quant):
