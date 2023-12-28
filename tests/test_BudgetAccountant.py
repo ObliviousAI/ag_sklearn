@@ -461,40 +461,43 @@ class TestBudgetAccountant(TestCase):
     def test_total_related_datasets(self):
         # Scenario 1: Empty graph
         acc = BudgetAccountant()
-        acc.add_to_budget("abc123", 1, 0)
-        acc.add_to_budget("xyz456", 1.5, 0)
-        acc.add_to_budget("def789", 2, 0)
-        acc.add_to_budget("ghi012", 2.5, 0)
-
+        dataset_ids = [
+        (1, 1, 0.1),
+        (2, 1, 0.1),
+        (3, 2, 0.2),
+        (4, 3, 0.1),
+        (5, 2, 0.3)
+    ]
+        
         graph = {}
-        dataset_id = "abc123"
-        epsilon, delta = acc.total_related_datasets(dataset_id, graph)
-        self.assertEqual(epsilon, 1)
-        self.assertEqual(delta, 0)
+        epsilon, delta = acc.total_related_datasets(dataset_ids, graph)
+        self.assertEqual(epsilon, max(row[1] for row in dataset_ids))
+        self.assertEqual(delta, max(row[2] for row in dataset_ids))
 
         # Scenario 2: Linear dependency graph
         graph = {
-            "abc123": ["xyz456"],
-            "xyz456": ["def789"],
-            "def789": []
+            1: [2],
+            4: [2],
+            5: [1,3]
         }
-        dataset_id = "abc123"
-        epsilon, delta = acc.total_related_datasets(dataset_id, graph)
+        epsilon, delta = acc.total_related_datasets(dataset_ids, graph)
        
-        self.assertEqual(epsilon, 4.5)
-        self.assertEqual(delta, 0)
+        self.assertEqual(epsilon, 6)
+        self.assertEqual(delta, 0.7)
 
         # Scenario 3: Complex dependency graph
         graph = {
-            "abc123": ["xyz456", "def789"],
-            "xyz456": ["ghi012"],
-            "def789": []
-            # Add more nodes as needed for a more complex graph
+            1: [2, 3],
+            2: [4],
+            3: [5],
+            4: [],
+            5: []
         }
-        dataset_id = "abc123"
-        epsilon, delta = acc.total_related_datasets(dataset_id, graph)
+        epsilon, delta = acc.total_related_datasets(dataset_ids, graph)
     
-        self.assertEqual(epsilon,7)
-        self.assertEqual(delta, 0)
+        self.assertEqual(epsilon,9)
+        self.assertEqual(delta, 0.8)
 
         # Add more scenarios with different graphs and datasets to cover various cases
+
+
