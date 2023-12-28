@@ -27,27 +27,7 @@ from diffprivlib.mechanisms import Exponential
 from diffprivlib.utils import warn_unused_args, PrivacyLeakWarning, check_random_state
 from diffprivlib.validation import clip_to_bounds, check_bounds
 from diffprivlib.tools.utils import _wrap_axis
-from diffprivlib.tools.utils import mean
 
-def find_quantile(array, quant,epsilon,bounds,random_state):
-    array=np.array(array)
-    array=array[~np.isnan(array)]
-    l,r=bounds
-    scale=(r-l)/r
-    l-=scale
-    r+=scale
-
-    for _ in range(32):
-        mid=(l+r)/2
-        val=mean((array<=mid).astype(int),epsilon,bounds=bounds,random_state=random_state)
-        if(val>=quant):
-            r=mid
-        else:
-            l=mid
-        
-    r=min(bounds[1],r)
-    r=max(bounds[0],r)
-    return r
 
 def quantile(array, quant, epsilon=1.0, bounds=None, axis=None, keepdims=False, random_state=None, accountant=None,
              **unused_args):
@@ -118,7 +98,7 @@ def quantile(array, quant, epsilon=1.0, bounds=None, axis=None, keepdims=False, 
         warnings.warn("Bounds have not been specified and will be calculated on the data provided. This will "
                       "result in additional privacy leakage. To ensure differential privacy and no additional "
                       "privacy leakage, specify bounds for each dimension.", PrivacyLeakWarning)
-        bounds = bounds = (np.nanmin(array), np.nanmax(array))
+        bounds = (np.min(array), np.max(array))
 
     quant = np.ravel(quant)
 
@@ -145,6 +125,7 @@ def quantile(array, quant, epsilon=1.0, bounds=None, axis=None, keepdims=False, 
     # Let's ravel array to be single-dimensional
     array = clip_to_bounds(np.ravel(array), bounds)
 
+    k = array.size
     array = np.append(array, list(bounds))
     array.sort()
 
@@ -153,10 +134,15 @@ def quantile(array, quant, epsilon=1.0, bounds=None, axis=None, keepdims=False, 
     # Todo: Need to find a way to do this in a differentially private way, see GH 80
     if np.isnan(interval_sizes).any():
         return np.nan
-    
+
+    mech = Exponential(epsilon=epsilon, sensitivity=1, utility=list(-np.abs(np.arange(0, k + 1) - quant * k)),
+                       measure=list(interval_sizes), random_state=random_state)
+    idx = mech.randomise()
+    output = random_state.random() * (array[idx+1] - array[idx]) + array[idx]
+
     accountant.spend(epsilon, 0)
 
-    return find_quantile(array,quant,epsilon,bounds,random_state)
+    return output
 
 
 def percentile(array, percent, epsilon=1.0, bounds=None, axis=None, keepdims=False, random_state=None, accountant=None,
@@ -280,15 +266,6 @@ def median(array, epsilon=1.0, bounds=None, axis=None, keepdims=False, random_st
 
     quantile, percentile
 
-    """
-    warn_unused_args(unused_args)
-
-    return quantile(array, 0.5, epsilon=epsilon, bounds=bounds, axis=axis, keepdims=keepdims, random_state=random_state,
-                    accountant=accountant)
-def nanmedian(array, epsilon=1.0, bounds=None, axis=None, keepdims=False, random_state=None, accountant=None,
-           **unused_args):
-    r"""
-    Compute the differentially private arithmetic meadian along the specified axis, ignoring NaNs.
     """
     warn_unused_args(unused_args)
 
