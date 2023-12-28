@@ -439,15 +439,6 @@ class TestBudgetAccountant(TestCase):
         self.assertIn("5", acc.__repr__(11))
     
     def test_add_to_budget(self):
-        # Test adding budgets to specific datasets
-        dataset_id = 'dataset1'
-        acc = BudgetAccountant()
-        acc.add_to_budget(dataset_id, 0.5, 0.1)
-        epsilon, delta = acc.total_for_dataset(dataset_id)
-        self.assertEqual(epsilon, 0.5)
-        self.assertEqual(delta, 0.1)
-    
-    def test_add_to_budget(self):
         dataset_id = "xyz456"  # Mock dataset ID
         
         acc = BudgetAccountant()
