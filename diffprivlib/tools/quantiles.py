@@ -27,7 +27,27 @@ from diffprivlib.mechanisms import Exponential
 from diffprivlib.utils import warn_unused_args, PrivacyLeakWarning, check_random_state
 from diffprivlib.validation import clip_to_bounds, check_bounds
 from diffprivlib.tools.utils import _wrap_axis
+from diffprivlib.tools.utils import mean
 
+def find_quantile(array, quant,epsilon,bounds,random_state):
+    array=np.array(array)
+    array=array[~np.isnan(array)]
+    l,r=bounds
+    scale=(r-l)/r
+    l-=scale
+    r+=scale
+
+    for _ in range(32):
+        mid=(l+r)/2
+        val=mean((array<=mid).astype(int),epsilon,bounds=bounds,random_state=random_state)
+        if(val>=quant):
+            r=mid
+        else:
+            l=mid
+        
+    r=min(bounds[1],r)
+    r=max(bounds[0],r)
+    return r
 
 def quantile(array, quant, epsilon=1.0, bounds=None, axis=None, keepdims=False, random_state=None, accountant=None,
              **unused_args):
@@ -125,7 +145,6 @@ def quantile(array, quant, epsilon=1.0, bounds=None, axis=None, keepdims=False, 
     # Let's ravel array to be single-dimensional
     array = clip_to_bounds(np.ravel(array), bounds)
 
-    k = array.size
     array = np.append(array, list(bounds))
     array.sort()
 
@@ -134,15 +153,10 @@ def quantile(array, quant, epsilon=1.0, bounds=None, axis=None, keepdims=False, 
     # Todo: Need to find a way to do this in a differentially private way, see GH 80
     if np.isnan(interval_sizes).any():
         return np.nan
-
-    mech = Exponential(epsilon=epsilon, sensitivity=1, utility=list(-np.abs(np.arange(0, k + 1) - quant * k)),
-                       measure=list(interval_sizes), random_state=random_state)
-    idx = mech.randomise()
-    output = random_state.random() * (array[idx+1] - array[idx]) + array[idx]
-
+    
     accountant.spend(epsilon, 0)
 
-    return output
+    return find_quantile(array,quant,epsilon,bounds,random_state)
 
 
 def percentile(array, percent, epsilon=1.0, bounds=None, axis=None, keepdims=False, random_state=None, accountant=None,
