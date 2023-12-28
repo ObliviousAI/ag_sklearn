@@ -142,6 +142,7 @@ class BudgetAccountant:
         self.__delta = delta
         self.__spent_budget = []
         self.slack = slack
+        self.dataset_budgets = {}
 
         if spent_budget is not None:
             if not isinstance(spent_budget, list):
@@ -467,3 +468,66 @@ class BudgetAccountant:
         default = BudgetAccountant._default
         BudgetAccountant._default = None
         return default
+    
+    def add_to_budget(self, dataset_id, epsilon, delta):
+        if dataset_id not in self.dataset_budgets:
+            self.dataset_budgets[dataset_id] = BudgetAccountant()
+
+        self.dataset_budgets[dataset_id].spend(epsilon, delta)
+    
+    def add_to_budget_laplace(self,dataset_id,open_dp_mechnasim,sensitivity=1):
+        if dataset_id not in self.dataset_budgets:
+            self.dataset_budgets[dataset_id] = BudgetAccountant()
+
+        epsilon=open_dp_mechnasim.map(d_in=sensitivity)
+
+        self.dataset_budgets[dataset_id].spend(epsilon,0)
+    
+    def add_to_budget_guassian(self,dataset_id,open_dp_mechnasim,sensitivity=1):
+        if dataset_id not in self.dataset_budgets:
+            self.dataset_budgets[dataset_id] = BudgetAccountant()
+
+        rho = open_dp_mechnasim.map(d_in=sensitivity)
+
+        scale = np.sqrt((sensitivity**2) / (2 * rho))
+
+        epsilon = sensitivity/scale
+
+        delta=1.25 * np.exp(-epsilon * rho * sensitivity / 2)
+        
+        self.dataset_budgets[dataset_id].spend(epsilon,delta)
+    
+    def total_for_dataset(self, dataset_id):
+        if dataset_id in self.dataset_budgets:
+            return self.dataset_budgets[dataset_id].total()
+        else:
+            return Budget(0, 0) 
+
+    def total_related_datasets(self, dataset_id_list, graph):
+        epsilon_spends = {}  # Dictionary to store total epsilon spend for each ID
+        delta_spends = {}  # Dictionary to store total delta spend for each ID
+            
+        for dataset_id, initial_epsilon, initial_delta in dataset_id_list:
+            epsilon, delta = self._calculate_budget(dataset_id,dataset_id_list, graph)
+            epsilon_spends[dataset_id] = epsilon
+            delta_spends[dataset_id] = delta
+
+        max_epsilon_spend = max(epsilon_spends.values())
+        max_delta_spend = max(delta_spends.values())
+        return Budget(max_epsilon_spend, max_delta_spend)
+
+    def _calculate_budget(self, dataset_id,dataset_id_list, graph):
+        initial_epsilon = [epsilon for id, epsilon, delta in dataset_id_list if id == dataset_id][0]
+        initial_delta = [delta for id, epsilon, delta in dataset_id_list if id == dataset_id][0]
+
+        total_epsilon = initial_epsilon  # Initialize total epsilon with the initial value
+        total_delta = initial_delta 
+
+        if dataset_id in graph:
+            related_datasets = graph[dataset_id]
+            for related_dataset_id in related_datasets:
+                epsilon, delta = self._calculate_budget(related_dataset_id,dataset_id_list, graph)
+                total_epsilon += epsilon
+                total_delta += delta
+
+        return total_epsilon, total_delta

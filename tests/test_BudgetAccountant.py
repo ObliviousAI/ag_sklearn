@@ -437,3 +437,58 @@ class TestBudgetAccountant(TestCase):
         self.assertNotIn("5", repr(acc))
         self.assertNotIn("5", acc.__repr__(10))
         self.assertIn("5", acc.__repr__(11))
+    
+    def test_add_to_budget(self):
+        dataset_id = "xyz456"  # Mock dataset ID
+        
+        acc = BudgetAccountant()
+
+        acc.add_to_budget(dataset_id, 2, 0)
+
+        new_epsilon, new_delta = acc.total_for_dataset(dataset_id)
+        self.assertEqual(new_epsilon, 2)
+        self.assertEqual(new_delta, 0) # Epsilon should not be zero for Laplace mechanism
+
+    def test_total_related_datasets(self):
+        # Scenario 1: Empty graph
+        acc = BudgetAccountant()
+        dataset_ids = [
+        (1, 1, 0.1),
+        (2, 1, 0.1),
+        (3, 2, 0.2),
+        (4, 3, 0.1),
+        (5, 2, 0.3)
+    ]
+        
+        graph = {}
+        epsilon, delta = acc.total_related_datasets(dataset_ids, graph)
+        self.assertEqual(epsilon, max(row[1] for row in dataset_ids))
+        self.assertEqual(delta, max(row[2] for row in dataset_ids))
+
+        # Scenario 2: Linear dependency graph
+        graph = {
+            1: [2],
+            4: [2],
+            5: [1,3]
+        }
+        epsilon, delta = acc.total_related_datasets(dataset_ids, graph)
+       
+        self.assertEqual(epsilon, 6)
+        self.assertEqual(delta, 0.7)
+
+        # Scenario 3: Complex dependency graph
+        graph = {
+            1: [2, 3],
+            2: [4],
+            3: [5],
+            4: [],
+            5: []
+        }
+        epsilon, delta = acc.total_related_datasets(dataset_ids, graph)
+    
+        self.assertEqual(epsilon,9)
+        self.assertEqual(delta, 0.8)
+
+        # Add more scenarios with different graphs and datasets to cover various cases
+
+
