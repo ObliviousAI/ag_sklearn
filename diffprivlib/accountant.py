@@ -503,21 +503,30 @@ class BudgetAccountant:
         else:
             return Budget(0, 0) 
 
-    def total_related_datasets(self, dataset_id, graph):
-        visited = set()  # Track visited nodes to avoid cycles
-        return Budget(*self._calculate_budget(dataset_id, visited, graph))
+    def total_related_datasets(self, dataset_id_list, graph):
+        epsilon_spends = {}  # Dictionary to store total epsilon spend for each ID
+        delta_spends = {}  # Dictionary to store total delta spend for each ID
+            
+        for dataset_id, initial_epsilon, initial_delta in dataset_id_list:
+            epsilon, delta = self._calculate_budget(dataset_id,dataset_id_list, graph)
+            epsilon_spends[dataset_id] = epsilon
+            delta_spends[dataset_id] = delta
 
-    def _calculate_budget(self, dataset_id, visited, graph):
-        if dataset_id in visited:
-            return 0, 0  # Avoid cycles in the graph
+        max_epsilon_spend = max(epsilon_spends.values())
+        max_delta_spend = max(delta_spends.values())
+        return Budget(max_epsilon_spend, max_delta_spend)
 
-        visited.add(dataset_id)
-        total_epsilon, total_delta = self.total_for_dataset(dataset_id)
+    def _calculate_budget(self, dataset_id,dataset_id_list, graph):
+        initial_epsilon = [epsilon for id, epsilon, delta in dataset_id_list if id == dataset_id][0]
+        initial_delta = [delta for id, epsilon, delta in dataset_id_list if id == dataset_id][0]
+
+        total_epsilon = initial_epsilon  # Initialize total epsilon with the initial value
+        total_delta = initial_delta 
 
         if dataset_id in graph:
             related_datasets = graph[dataset_id]
             for related_dataset_id in related_datasets:
-                epsilon, delta = self._calculate_budget(related_dataset_id, visited, graph)
+                epsilon, delta = self._calculate_budget(related_dataset_id,dataset_id_list, graph)
                 total_epsilon += epsilon
                 total_delta += delta
 
